@@ -5,34 +5,33 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
-require('dotenv').config();
+const dotenv = require('dotenv');
+const methodOverride = require('method-override');
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(bodyParser.json());
+app.use(cors({
+  origin: 'https://66799b790b935c08972014e3--guileless-donut-85ffb0.netlify.app',
+  credentials: true // Allow cookies with CORS
+}));
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({ mongoUrl: process.env.MONGO_DB_URI }),
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'none' // Adjust as needed
+  }
+}));
+app.use(methodOverride('_method')); // Enable method override
 
-const allowedOrigins = [
-  'http://127.0.0.1:8080',
-  'https://66799b790b935c08972014e3--guileless-donut-85ffb0.netlify.app/'
-];
-
-const corsOptions = {
-  origin: function (origin, callback) {
-    console.log('Origin:', origin); // Debugging line
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true // Enable Access-Control-Allow-Credentials
-};
-
-app.use(cors(corsOptions));
-
-// Connect to MongoDB
+// MongoDB Connection
 const mongoURI = process.env.MONGO_DB_URI;
 mongoose.connect(mongoURI, {
   useNewUrlParser: true,
@@ -41,16 +40,7 @@ mongoose.connect(mongoURI, {
 .then(() => console.log('MongoDB connected successfully'))
 .catch(err => console.error('MongoDB connection error:', err));
 
-// Session setup
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
-  resave: false,
-  saveUninitialized: false,
-  store: MongoStore.create({ mongoUrl: mongoURI }),
-  cookie: { secure: process.env.NODE_ENV === 'production' } // Set secure to true in production with HTTPS
-}));
-
-// User Schema
+// User Schema and Routes
 const userSchema = new mongoose.Schema({
   email: { type: String, unique: true, required: true },
   username: { type: String, unique: true, required: true },
@@ -58,8 +48,7 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
-// Routes for user authentication
-app.post('/signup', async (req, res) => {
+app.post('/signup', async (req, res, next) => {
   const { email, username, password } = req.body;
   try {
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
@@ -71,11 +60,11 @@ app.post('/signup', async (req, res) => {
     await newUser.save();
     res.status(201).send('Signup successful');
   } catch (err) {
-    res.status(500).send(err.message);
+    next(err); // Pass error to the error handling middleware
   }
 });
 
-app.post('/login', async (req, res) => {
+app.post('/login', async (req, res, next) => {
   const { username, password } = req.body;
   try {
     const user = await User.findOne({ username });
@@ -85,16 +74,16 @@ app.post('/login', async (req, res) => {
     req.session.user = user;
     res.status(200).send('Login successful');
   } catch (err) {
-    res.status(500).send(err.message);
+    next(err); // Pass error to the error handling middleware
   }
 });
 
-app.get('/logout', (req, res) => {
+app.get('/logout', (req, res, next) => {
   req.session.destroy(err => {
     if (err) {
-      return res.status(500).send('Could not log out');
+      return next(err); // Pass error to the error handling middleware
     }
-    res.clearCookie('connect.sid'); // Clear the session cookie manually
+    res.clearCookie('connect.sid');
     res.status(200).send('Logout successful');
   });
 });
@@ -113,7 +102,7 @@ app.get('/protected', checkAuth, (req, res) => {
   res.status(200).send('You are authenticated');
 });
 
-// Define schemas and models for other collections
+// Package Schemas and Routes
 const flightSchema = new mongoose.Schema({
   details: String,
   flightNumber: String,
@@ -168,17 +157,17 @@ const packageSchema = new mongoose.Schema({
 const Package = mongoose.model('Package', packageSchema);
 
 // Routes for packages
-app.get('/api/packages/:destination', async (req, res) => {
+app.get('/api/packages/:destination', async (req, res, next) => {
   const { destination } = req.params;
   try {
     const packages = await Package.find({ destination });
     res.json(packages);
   } catch (err) {
-    res.status(500).send(err);
+    next(err); // Pass error to the error handling middleware
   }
 });
 
-app.get('/api/package/:id', async (req, res) => {
+app.get('/api/package/:id', async (req, res, next) => {
   const { id } = req.params;
   try {
     const package = await Package.findById(id);
@@ -187,8 +176,14 @@ app.get('/api/package/:id', async (req, res) => {
     }
     res.json(package);
   } catch (err) {
-    res.status(500).send(err);
+    next(err); // Pass error to the error handling middleware
   }
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send('Something went wrong!');
 });
 
 // Start the server
