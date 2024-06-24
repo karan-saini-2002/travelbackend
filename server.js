@@ -2,6 +2,10 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const session = require('express-session');
+const MongoStore = require('connect-mongo');
+
 
 require('dotenv').config();
 
@@ -10,7 +14,10 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(bodyParser.json());
-app.use(cors());
+app.use(cors({
+  origin: 'http://127.0.0.1:8080', // Allow requests from this origin
+  credentials: true // Allow credentials (cookies, authorization headers)
+}));
 
 // Connect to MongoDB
 const mongoURI = process.env.MONGO_DB_URI;
@@ -20,6 +27,78 @@ mongoose.connect(mongoURI, {
 })
 .then(() => console.log('MongoDB connected successfully'))
 .catch(err => console.error('MongoDB connection error:', err));
+
+// Session setup
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({ mongoUrl: mongoURI }),
+  cookie: { secure: false } // Should be true in production with HTTPS
+}));
+
+// User Schema
+const userSchema = new mongoose.Schema({
+  email: { type: String, unique: true, required: true },
+  username: { type: String, unique: true, required: true },
+  password: { type: String, required: true }
+});
+const User = mongoose.model('User', userSchema);
+
+// Routes for user authentication
+app.post('/signup', async (req, res) => {
+  const { email, username, password } = req.body;
+  try {
+    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+    if (existingUser) {
+      return res.status(400).send('Email or username already exists');
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = new User({ email, username, password: hashedPassword });
+    await newUser.save();
+    res.status(201).send('Signup successful');
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const user = await User.findOne({ username });
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(400).send('Invalid username or password');
+    }
+    req.session.user = user;
+    res.status(200).send('Login successful');
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+app.get('/logout', (req, res) => {
+  req.session.destroy(err => {
+    if (err) {
+      return res.status(500).send('Could not log out');
+    }
+    res.clearCookie('connect.sid'); // Clear the session cookie manually
+    res.status(200).send('Logout successful');
+  });
+});
+
+// Middleware to check if the user is authenticated
+function checkAuth(req, res, next) {
+  if (req.session.user) {
+    next();
+  } else {
+    res.status(401).send('Unauthorized');
+  }
+}
+
+// Example protected route
+app.get('/protected', checkAuth, (req, res) => {
+  res.status(200).send('You are authenticated');
+});
 
 const flightSchema = new mongoose.Schema({
   details: String,
