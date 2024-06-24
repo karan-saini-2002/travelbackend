@@ -1,7 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
-const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
@@ -11,14 +10,10 @@ const methodOverride = require('method-override');
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(bodyParser.json());
-app.use(cors({
-  origin: 'https://66799b790b935c08972014e3--guileless-donut-85ffb0.netlify.app',
-  credentials: true // Allow cookies with CORS
-}));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
@@ -79,15 +74,22 @@ app.post('/login', async (req, res, next) => {
 });
 
 app.get('/logout', (req, res) => {
+  console.log("Logout request received"); // Check if the request reaches this point
+  
   req.session.destroy(err => {
     if (err) {
+      console.error('Error destroying session:', err); // Log any errors
       return res.status(500).send('Could not log out');
     }
+    
+    console.log("Session destroyed successfully"); // Log success message
+    
     res.clearCookie('connect.sid'); // Clear the session cookie manually
-    res.redirect('/login.html'); // Redirect to login page after logout
+    console.log("Session cookie cleared"); // Log success message
+    
+    res.redirect('login.html'); // Redirect to login page after logout
   });
 });
-
 
 // Middleware to check if the user is authenticated
 function checkAuth(req, res, next) {
@@ -97,13 +99,6 @@ function checkAuth(req, res, next) {
     res.status(401).send('Unauthorized');
   }
 }
-app.use((req, res, next) => {
-  // Set Cache-Control headers to prevent caching
-  res.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  res.header('Expires', '-1');
-  res.header('Pragma', 'no-cache');
-  next();
-});
 
 // Example protected route
 app.get('/protected', checkAuth, (req, res) => {
