@@ -14,11 +14,22 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(bodyParser.json());
-app.use(cors({
-  origin: 'http://127.0.0.1:8080', // Allow requests from this origin
-  credentials: true // Allow credentials (cookies, authorization headers)
-}));
+const allowedOrigins = [
+  'http://127.0.0.1:8080', 
+  'https://66798c16dd68c8bea0fc25b2--coruscating-licorice-413f1c.netlify.app'
+];
 
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+};
+
+app.use(cors(corsOptions));
 // Connect to MongoDB
 const mongoURI = process.env.MONGO_DB_URI;
 mongoose.connect(mongoURI, {
