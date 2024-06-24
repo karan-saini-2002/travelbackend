@@ -15,7 +15,7 @@ app.use(bodyParser.json());
 
 const allowedOrigins = [
   'http://127.0.0.1:8080',
-  'https://66798c16dd68c8bea0fc25b2--coruscating-licorice-413f1c.netlify.app'
+  'https://66799b790b935c08972014e3--guileless-donut-85ffb0.netlify.app/'
 ];
 
 const corsOptions = {
