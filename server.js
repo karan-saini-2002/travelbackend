@@ -5,8 +5,6 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
-
-
 require('dotenv').config();
 
 const app = express();
@@ -14,22 +12,26 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(bodyParser.json());
+
 const allowedOrigins = [
-  'http://127.0.0.1:8080', 
+  'http://127.0.0.1:8080',
   'https://66798c16dd68c8bea0fc25b2--coruscating-licorice-413f1c.netlify.app'
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
-    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+    console.log('Origin:', origin); // Debugging line
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
     }
-  }
+  },
+  credentials: true // Enable Access-Control-Allow-Credentials
 };
 
 app.use(cors(corsOptions));
+
 // Connect to MongoDB
 const mongoURI = process.env.MONGO_DB_URI;
 mongoose.connect(mongoURI, {
@@ -45,7 +47,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   store: MongoStore.create({ mongoUrl: mongoURI }),
-  cookie: { secure: false } // Should be true in production with HTTPS
+  cookie: { secure: process.env.NODE_ENV === 'production' } // Set secure to true in production with HTTPS
 }));
 
 // User Schema
@@ -111,6 +113,7 @@ app.get('/protected', checkAuth, (req, res) => {
   res.status(200).send('You are authenticated');
 });
 
+// Define schemas and models for other collections
 const flightSchema = new mongoose.Schema({
   details: String,
   flightNumber: String,
@@ -140,7 +143,7 @@ const itineraryDaySchema = new mongoose.Schema({
   car: String,
   sightseeing: String
 });
-// Activity Schema
+
 const activitySchema = new mongoose.Schema({
   name: String,
   img: String,
@@ -164,7 +167,7 @@ const packageSchema = new mongoose.Schema({
 });
 const Package = mongoose.model('Package', packageSchema);
 
-// Routes
+// Routes for packages
 app.get('/api/packages/:destination', async (req, res) => {
   const { destination } = req.params;
   try {
