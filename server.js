@@ -78,15 +78,16 @@ app.post('/login', async (req, res, next) => {
   }
 });
 
-app.get('/logout', (req, res, next) => {
+app.get('/logout', (req, res) => {
   req.session.destroy(err => {
     if (err) {
-      return next(err); // Pass error to the error handling middleware
+      return res.status(500).send('Could not log out');
     }
-    res.clearCookie('connect.sid');
-    res.status(200).send('Logout successful');
+    res.clearCookie('connect.sid'); // Clear the session cookie manually
+    res.redirect('/login.html'); // Redirect to login page after logout
   });
 });
+
 
 // Middleware to check if the user is authenticated
 function checkAuth(req, res, next) {
@@ -96,6 +97,13 @@ function checkAuth(req, res, next) {
     res.status(401).send('Unauthorized');
   }
 }
+app.use((req, res, next) => {
+  // Set Cache-Control headers to prevent caching
+  res.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  res.header('Expires', '-1');
+  res.header('Pragma', 'no-cache');
+  next();
+});
 
 // Example protected route
 app.get('/protected', checkAuth, (req, res) => {
