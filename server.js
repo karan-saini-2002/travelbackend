@@ -16,7 +16,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser()); 
 // CORS options
-const allowedOrigins = ['http://127.0.0.1:8080', 'https://kjadssa.netlify.app'];
+const allowedOrigins = ['http://127.0.0.1:8080', 'https://travelwebappkaransaini.netlify.app'];
 
 app.use(cors({
   origin: function (origin, callback) {
