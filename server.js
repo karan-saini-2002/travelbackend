@@ -16,12 +16,21 @@ app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser()); 
 // CORS options
-const corsOptions = {
-  origin: 'http://127.0.0.1:8080', 
-  methods: ['GET', 'POST','DELETE', 'PUT'], 
-  credentials: true 
-};
-app.use(cors(corsOptions));
+const allowedOrigins = ['http://127.0.0.1:8080', 'https://kjadssa.netlify.app'];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  }
+}));
+
+app.use(express.json());
 
 // Connect to MongoDB
 const mongoURI = process.env.MONGO_DB_URI;
